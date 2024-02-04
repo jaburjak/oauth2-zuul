@@ -7,13 +7,13 @@
 			"email": "jaburek.jakub@gmail.com"
 		}
 	],
-	"minimum-stability": "dev",
+	"minimum-stability": "stable",
 	"prefer-stable": true,
 	"require": {
 		"php": ">=8.2",
 		"ext-ctype": "*",
 		"ext-iconv": "*",
-		"jaburjak/oauth2-zuul": "dev-main",
+		"jaburjak/oauth2-zuul": "^1",
 		"knpuniversity/oauth2-client-bundle": "^2.18",
 		"symfony/console": "7.0.*",
 		"symfony/debug-bundle": "7.0.*",
@@ -79,11 +79,5 @@
 			"allow-contrib": true,
 			"require": "7.0.*"
 		}
-	},
-	"repositories": [
-		{
-			"type": "path",
-			"url": "../"
-		}
-	]
+	}
 }

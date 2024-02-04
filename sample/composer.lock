@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bf55dc5c05c4704669e9be9b2bc8c2d2",
+    "content-hash": "eb500460b1b6686718f0c550050f7425",
     "packages": [
         {
             "name": "guzzlehttp/guzzle",
@@ -333,11 +333,17 @@
         },
         {
             "name": "jaburjak/oauth2-zuul",
-            "version": "dev-main",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jaburjak/oauth2-zuul.git",
+                "reference": "781bf863052f0c1afec79a3064b4b5608df2f514"
+            },
             "dist": {
-                "type": "path",
-                "url": "..",
-                "reference": "3b1c91ddbcebb9aba533f3277efbdd8e77b468e3"
+                "type": "zip",
+                "url": "https://api.github.com/repos/jaburjak/oauth2-zuul/zipball/781bf863052f0c1afec79a3064b4b5608df2f514",
+                "reference": "781bf863052f0c1afec79a3064b4b5608df2f514",
+                "shasum": ""
             },
             "require": {
                 "league/oauth2-client": "^2.0",
@@ -349,6 +355,7 @@
                     "OAuth2Zuul\\": "src/"
                 }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -359,9 +366,11 @@
                 }
             ],
             "description": "FIT CTU Zuul Provider for the PHP League’s OAuth 2.0 Client.",
-            "transport-options": {
-                "relative": true
-            }
+            "support": {
+                "issues": "https://github.com/jaburjak/oauth2-zuul/issues",
+                "source": "https://github.com/jaburjak/oauth2-zuul/tree/v1.0.0"
+            },
+            "time": "2024-02-04T17:31:14+00:00"
         },
         {
             "name": "knpuniversity/oauth2-client-bundle",
@@ -4508,10 +4517,8 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "dev",
-    "stability-flags": {
-        "jaburjak/oauth2-zuul": 20
-    },
+    "minimum-stability": "stable",
+    "stability-flags": [],
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
