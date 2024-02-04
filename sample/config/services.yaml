@@ -1,0 +1,17 @@
+parameters:
+    zuul.client_id: '%env(ZUUL_CLIENT_ID)%'
+    zuul.client_secret: '%env(ZUUL_CLIENT_SECRET)%'
+    zuul.scopes:
+        - 'cvut:umapi:read'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+
+    Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface: '@App\Security\ZuulAuthenticator'

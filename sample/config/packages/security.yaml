@@ -1,0 +1,19 @@
+security:
+    providers:
+        user_provider:
+            id: App\Security\UserProvider
+
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+
+        main:
+            lazy: true
+            provider: user_provider
+            custom_authenticators:
+                - App\Security\ZuulAuthenticator
+            entry_point: App\Security\ZuulAuthenticator
+            logout:
+                path: auth_logout
+                target: index

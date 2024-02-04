@@ -1,0 +1,16 @@
+{% extends 'base.html.twig' %}
+{% block body %}
+	<p>You are logged in as {{ username }}. <a href="{{ path('auth_logout') }}">Log out</a></p>
+	<table>
+		<tr>
+			<th>Access Token:</th>
+			<td>{{ token.accessToken }}</td>
+		</tr>
+		<tr>
+			<th>Refresh Token:</th>
+			<td>{{ token.refreshToken }}</td>
+		</tr>
+	</table>
+	<p>User information from Usermap:</p>
+	<pre>{{ info }}</pre>
+{% endblock %}

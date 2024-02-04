@@ -1,0 +1,8 @@
+knpu_oauth2_client:
+    clients:
+        zuul:
+            type: generic
+            provider_class: OAuth2Zuul\Provider\Zuul
+            client_id: '%zuul.client_id%'
+            client_secret: '%zuul.client_secret%'
+            redirect_route: auth_zuul_check

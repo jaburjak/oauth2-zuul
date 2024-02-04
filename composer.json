@@ -1,0 +1,22 @@
+{
+	"name": "jaburjak/oauth2-zuul",
+	"description": "FIT CTU Zuul Provider for the PHP League’s OAuth 2.0 Client.",
+	"type": "library",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Jakub Jabůrek",
+			"email": "jaburek.jakub@gmail.com"
+		}
+	],
+	"minimum-stability": "stable",
+	"require": {
+		"php": ">=7.4",
+		"league/oauth2-client": "^2.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"OAuth2Zuul\\": "src/"
+		}
+	}
+}

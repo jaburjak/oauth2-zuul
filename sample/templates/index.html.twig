@@ -1,0 +1,8 @@
+{% extends 'base.html.twig' %}
+{% block body %}
+	{% if auth_error is not null %}
+		<p>{{ auth_error }}</p>
+	{% endif %}
+
+	<p><a href="{{ path('user') }}">{% if app.user is null %}Log in{% else %}User details{% endif %}</a></p>
+{% endblock %}

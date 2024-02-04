@@ -1,0 +1,3 @@
+# Files for Composer to ignore when pulling the package
+
+/sample/ export-ignore

@@ -1,0 +1,58 @@
+= FIT CTU Provider for OAuth 2.0 Client
+
+This package provides https://fit.cvut.cz/en/[FIT CTU] OAuth 2.0 support for the PHP League’s https://github.com/thephpleague/oauth2-client[OAuth 2.0 Client].
+
+[[requirements]]
+== Requirements
+
+Requires PHP version 7.4 or newer and The League’s OAuth 2.0 Client version 2.
+
+To be able to authenticate users via the FIT CTU Identity Provider, you must create a Client ID and a Client Secret for your application. Follow the https://help.fit.cvut.cz/dev/oauth2.html[official instructions] (in Czech) to obtain them.
+
+[[installation]]
+== Installation
+
+Use https://getcomposer.org/[Composer] to install:
+
+[source,sh]
+----
+$ composer require jaburjak/oauth2-zuul
+----
+
+[[usage]]
+== Usage
+
+The usage is the same as The League’s OAuth client, using `\OAuth2Zuul\Provider\Zuul` as the provider. For examples, refer to https://oauth2-client.thephpleague.com/usage/[The League’s documentation].
+
+[source,php]
+----
+$provider = new OAuth2Zuul\Provider\Zuul([
+	'clientId'     => '<zuul-client-id>',
+	'clientSecret' => '<zuul-client-secret>',
+	'redirectUri'  => 'https://example.com/callback-url',
+	// optional
+	'scopes'       => ['cvut:umapi:read'],
+	// optional, value here is the default
+	'base_url'     => 'https://auth.fit.cvut.cz'
+]);
+----
+
+[[sample]]
+=== Sample project
+
+An opinionated sample project using this package, based on the Symfony framework, showcasing user authentication and accessing CTU APIs, and featuring detailed description of its implementation, is available in the https://github.com/jaburjak/oauth2-zuul/tree/main/sample[`sample`] subdirectory.
+
+[[credits]]
+== Credits
+
+* https://www.jaburjak.cz/[Jakub Jabůrek]
+
+[[support]]
+== Support
+
+If you find a bug or encounter any issue, please https://github.com/jaburjak/oauth2-zuul/issues[file an issue].
+
+[[license]]
+== License
+
+The MIT License (MIT). Please see https://github.com/jaburjak/oauth2-zuul/blob/main/LICENSE[License File] for more information.

@@ -1,0 +1,185 @@
+= Sample Symfony application using FIT CTU OAuth 2.0 Identity Provider
+
+This is a minimal working example of a Symfony 7.0 web application that uses the https://help.fit.cvut.cz/dev/oauth2.html[Zuul OAuth 2.0] at https://fit.cvut.cz[FIT CTU] as its Identity Provider. The following components are used to implement user authentication:
+
+1. https://symfony.com/doc/7.0/security.html[Symfony Security]
+2. https://github.com/knpuniversity/oauth2-client-bundle[`knpuniversity/oauth2-client-bundle`]
+4. https://github.com/jaburjak/oauth2-zuul[`jaburjak/oauth2-zuul`]
+
+[[run]]
+== Running the sample application
+
+NOTE: It is assumed that the reader has at least some experience with PHP, the Symfony framework and Composer.
+
+As the first step, you’ll need to download the Composer dependencies for the sample project. To do that, run the following command in the project directory:
+
+[source,sh]
+----
+$ composer install
+----
+
+Before you can start the application, you have to provide a Client ID and Client Secret. These will authorize the application at the Identity Provider.
+
+To obtain them, go to https://auth.fit.cvut.cz/manager/[Apps Manager]. Create a new project, then click on the _Services_ button in the left sidebar and activate `cvut:umapi:read` scope under _Usermap API_. Then move to the _Apps_ page via the left sidebar and create a new application. When creating the application, select the _Web Application_ type and fill `\http://localhost:8000/auth/zuul/check` as the _Redirection URI_.
+
+After you receive your Client ID and Client Secret, use the https://symfony.com/doc/7.0/configuration/secrets.html[Symfony Secrets system] to supply them to the sample application. Run the two following commands, they’ll ask you for the secrets’ values. Paste the Client ID and Client Secret you got from the Apps Manager.
+
+[source,sh]
+----
+$ php bin/console secrets:set ZUUL_CLIENT_ID
+$ php bin/console secrets:set ZUUL_CLIENT_SECRET
+----
+
+Now, run the https://symfony.com/doc/7.0/setup/symfony_server.html[Symfony Local Web Server] to test out the application:
+
+[source,sh]
+----
+$ symfony server:start --port=8000 --no-tls
+----
+
+Congratulations, you can now navigate to http://localhost:8000 and log in using your CTU account.
+
+[[implementation]]
+== How it’s implemented
+
+There’s a xref:#tldr[TL;DR] at the end.
+
+As a prerequisite, please https://symfony.com/doc/7.0/security.html[read the documentation of Symfony Security] and get yourself familiar with https://www.rfc-editor.org/rfc/rfc6749[OAuth 2.0]. To understand the rest of this text, you should know what https://symfony.com/doc/7.0/security.html#the-firewall[firewall] (not the kind they teach in https://courses.fit.cvut.cz/BI-PSI/[BI-PSI]), https://symfony.com/doc/7.0/security/user_providers.html[user provider] and https://symfony.com/doc/7.0/security/custom_authenticator.html[security authenticator] are and how an https://www.oauth.com/oauth2-servers/server-side-apps/authorization-code/[OAuth 2.0 Authorization Code Flow] works.
+
+To create a custom authentication mechanism – leveraging the Zuul OAuth 2.0 Identity Provider in our case –, we need to implement at least a User Provider, User Entity and an Authenticator. The User Provider is responsible for taking a user identifier (CTU username in our case) and using it to construct an object (the User Entity) that represents the user. The Authenticator takes an HTTP request, extracts the authentication data (Authorization Code from the Identity Provider in our case) and creates a Passport, which is a container for the User Entity (and possibly other data and functionality, which we don’t use here).
+
+Apart from the three components already mentioned, the sample application implements a Token Manager and Usermap Service. These might not be necessary in your application, but the sample application also illustrates how to call CTU APIs with the Access Token obtained during authentication. That is our use for these two additional components.
+
+In the following sections, we will explain what are the responsibilities of each component in the sample application and how exactly they are implemented. It is recommended to look at the source code while you’re reading.
+
+[[user-entity]]
+=== User Entity
+
+We’ll start with the User Entity, which is implemented in `src/Security/User.php`. It must implement the `UserInterface`, which declares methods `getRoles()`, `getUserIdentifier()` and `eraseCredentials()`.
+
+The sample application has a static set of roles – just `ROLE_USER`. Note that the User Entity carries roles used internally in our application, not CTU roles from https://usermap.cvut.cz[Usermap]. You could, for example, query Usermap in your own User Provider implementation to determine which “internal” roles to assign.
+
+Method `getUserIdentifier()` must return a string, in our case, it is the CTU username.
+
+The last mandatory method is `eraseCredentials()`. By default, it is called automatically after the authentication is complete. In our case, we erase the user’s Access and Refresh Tokens, since we don’t trust ourselves enough to store them persistently. But if we wanted to save them to a database, for example, to make API calls on behalf of the user even when they aren’t logged in to our application, we would have to remove the null assignment.
+
+A closing remark concerning the User Entity: In your own project, you can move the class to the `App\Entity` namespace and make it a full-blown Doctrine entity.
+
+[[user-provider]]
+=== User Provider
+
+As explained before, the User Provider is responsible for taking a user identifier (CTU username in our case), and constructing the User Entity that corresponds to the given identifier. The sample implementation, located in `src/Security/UserProvider.php`, is trivial – we don’t store users in a database, so we simply create a new instance of the User Entity each time the `loadUserByIdentifier()` method is called.
+
+If we wanted to keep users in a database, the User Provider is the place to implement that. A relevant commented-out example code snippet is present in the referenced file.
+
+NOTE: The `loadUserByIdentifier()` method will not actually be called by Symfony unless we use features such as user switching or “remember me”. When logging in, it is the Authenticator’s responsibility to construct the User Entity, which will then be stored in the session and not recreated on every request. However, to keep things simple and extendable in the future, our Authenticator just delegates the User Entity’s construction to `loadUserByIdentifier()`, as we’ll explain later on.
+
+As User Entities are not re-constructed on each request, rather they are serialized into the session, they may get stale or incomplete. That’s why Symfony calls `refreshUser()` on each request after the User Entity is loaded from the session. Our User Provider uses a very simple way to ensure the entity is never stale: it forwards the call to `loadUserByIdentifier()`, which will always return a brand new and fresh instance.
+
+[[token-manager]]
+=== Token Manager
+
+The Token Manager is a custom component that we implemented in `src/OAuth2` in order to store, retrieve and refresh OAuth 2.0 Tokens of a particular user. We store the Access and Refresh Tokens in the xref:#user-entity[User Entity] and in the HTTP session.
+
+However, because of how `eraseCredentials()` in the User Entity is implemented, the tokens will be immediately cleared from the entity and remain only in the session. If we used a database and were confident in the security of our server, we could remove the null assignment from `eraseCredentials()`, uncomment the example code snippets in the Token Manager implementation and store the tokens in the database.
+
+[[authenticator]]
+=== Authenticator
+
+The Authenticator, implemented in `src/Security/ZuulAuthenticator.php`, is a component responsible for extracting user credentials from an HTTP request. In our case, it will be the Authorization Code provided in a query parameter when the Identity Provider redirects the user back to our application.
+
+To determine whether to attempt credentials extraction, the `supports()` method is called by the Symfony framework. In our case, we receive the Authorization Code only when the user returns from the Identity Provider. Therefore the `supports()` method checks whether the current route is the one designated for the Identity Provider to redirect the user back to. In all other cases, the Authenticator does nothing.
+
+When `supports()` returns `true`, the `authenticate()` method gets called. It uses the OAuth 2.0 Client provided by `knpuniversity/oauth2-client-bundle` to fetch the Access Token from the Identity Provider based on the Authorization Code (the client will retrieve the code automatically from Symfony’s `RequestStack` infrastructure, which is why we don’t pass it anywhere ourselves).
+
+After the Access Token is obtained, we create the Passport and User Badge. In the user loader callback, we call `fetchUserFromToken()` on the OAuth 2.0 client, because the Access Token itself does not contain any information about the user. This way, we can obtain the CTU username of the user. Then, we delegate to the xref:#user-provider[User Provider] to construct an instance of the User Entity.
+
+We usually need to store the Access Token for later, for the application to be able to call CTU APIs on the user’s behalf (e.g. fetch their personal timetable). For that, we delegate to the xref:#token-manager[Token Manager] by calling its `saveToken()` method.
+
+Next, `onAuthenticationSuccess()` gets called. We don’t do anything and return `null`, which means the request will proceed and will be handled by the controller. The controller (explained in detail in the xref:#controller[Controller] section) will redirect the user to the page that they originally requested before they were logged in. I decided to make the redirect a responsibility of the controller on a whim, you could have chosen to return a `RedirectResponse` immediately from `onAuthenticationSuccess()`.
+
+If for any reason authentication fails, `onAuthenticationFailure()` gets called and the user is redirected to the index page. The exception describing the failure reason is stored in the session. To see how it can be retrieved and displayed later on, go to `src/Controller/PageController.php`. Note that if the user fails to log in at the Identity Provider (e.g. they provide an incorrect username or password), they will not return to our application: the Identity Provider itself will inform them about their error. Authentication failures handled by our application will generally consist of invalid scopes, expired Authorization Codes and alike.
+
+The last method is `start()`, which comes from `AuthenticationEntrypointInterface`. Its responsibility is to start the authentication process when an anonymous user tries to access a page that requires logging in. In our case, the user gets redirected to the Identity Provider, where they’ll enter their username and password. We don’t construct the URL of the Identity Provider by hand, instead, we retrieve the correct `RedirectResponse` from the OAuth 2.0 client.
+
+[[controller]]
+=== Controller
+
+First, we will have a look at the `SecurityController` implemented in `src/Controller/SecurityController.php`. It contains two mandatory routes: `checkAction()` and `logoutAction()`.
+
+In the `Route` attribute of `checkAction()`, we define which URL the user will be redirected to when returning from the Identity Provider (see the xref:#configuration[Configuration] section), and what action will be performed on successful authentication (as discussed in the xref:#authenticator[Authenticator] section). Our implementation tries to figure out which page the user was before they were forced to log in (in case the user attempts to visit a route that requires authentication, Symfony will store its URL in the session before starting the authentication process), and redirect them back to it.
+
+The second mandatory route in `SecurityController` is `logoutAction()`. Its purpose is to define (again using the `Route` attribute) which URL in our application will cause the user to get logged out; the actual logout action will be performed by the framework itself (see the xref:#configuration[Configuration] section).
+
+Additionally, we implement the `loginAction()` route. This is an optional convenience route, which the user can visit to force logging in. Notice that we don’t actually use it anywhere, instead, the “Log in” link takes the user to `/user`, which is guarded by an `IsGranted` attribute. When an unauthenticated user tries to visit such a route, the `ZuulAuthenticator::start()` method kicks in and starts the authentication process. The `loginAction()` lets the user do that without having to visit a protected route.
+
+The second controller, implemented in `src/Controller/PageController.php`, is responsible for rendering the index and user pages.
+
+On the index page, we render the `templates/index.html.twig` template. It contains a link to the `user` route, displaying the text “Log in” when an unauthenticated user is visiting, and “User details” after the user logs in. Because the xref:#authenticator[Authenticator] is configured to redirect the user to the `index` route upon login failure, we want to display the failure reason on this page. Symfony provides an `AuthenticationUtils` object that we can use to retrieve the reason why the login has failed.
+
+The user page is guarded by the `IsGranted` attribute. As we mentioned before, Symfony will return the result of `ZuulAuthenticator::start()` when an unauthenticated user tries to access such route. For authenticated users, we retrieve their xref:#user-entity[User Entity] by calling `getUser()` implemented in Symfony’s `AbstractController`. Additionally, as a part of demonstrating how to use the OAuth tokens to call CTU APIs, we call xref:#usermap-service[Usermap Service]. We also want to display the tokens themselves to the user, for that, we call the xref:#token-manager[Token Manager].
+
+[[configuration]]
+=== Configuration
+
+First, let’s look at the `config/services.yaml` configuration file. We define three parameters — `zuul.client_id`, `zuul.client_secret` and `zuul.scopes`. The `client_id` and `client_secret` parameters take their value from the Symfony Secrets system (mentioned in the xref:#run[previous chapter]). In `zuul.scopes`, we define what OAuth 2.0 scopes to request from the Identity Provider. Additionally, we create an alias from `AuthenticationEntryPointInterface` to `ZuulAuthenticator`, so when we type-hint the interface (for example in `SecurityController`), it will get resolved to `ZuulAuthenticator`, which implements that interface.
+
+Next, we have to configure the framework to use our xref:#user-provider[User Provider] and our xref:#authenticator[Authenticator]. We do that in `config/packages/security.yaml`. Note that in this file, we reference the `SecurityController::logoutAction()` route, as explained in the xref:#controller[previous section].
+
+The last relevant configuration file is `config/packages/knpu_oauth2_client.yaml`, which configures the OAuth 2.0 client library. In that file, we set up a client named `zuul` with a provider from the `jaburjak/oauth2-zuul` library. The provider class specified how the OAuth 2.0 will communicate with the Identity Provider (the IdP’s URL, etc.).
+
+Notice we set the redirect route to `auth_zuul_check`. That is where the Identity Provider will redirect the user after they log in. The actual URL is defined in `SecurityController::checkAction()` and must match the _Redirection URI_ value in Apps Manager (see the xref:#run[previous chapter]). When accessing this route, `ZuulAuthenticator` retrieves the user’s Access and Refresh Tokens passed by the Identity Provider in the URL.
+
+[[usermap-service]]
+=== Usermap Service
+
+To illustrate how to call a CTU API with an Access Token obtained during user authentication, we implemented a service that fetches information about a particular person from Usermap. The source code is located in `src/Service/UsermapService.php`.
+
+Note that in the `request()` method we check the status code returned from the API. In case it indicates an authorization failure, we assume the OAuth 2.0 Access Token has expired and we refresh it using the xref:#token-manager[Token Manager]. Then we submit the request again.
+
+[[tldr]]
+== TL;DR — How do I steal this for my own project?
+
+In your project, run the following commands:
+
+[source,sh]
+----
+$ composer require jaburjak/oauth2-zuul knpuniversity/oauth2-client-bundle
+$ php bin/console secrets:generate-keys
+----
+
+Make sure you have your Client ID and Client Secret ready (xref:#run[see previous chapter]) and paste them when asked by the following commands:
+
+[source,sh]
+----
+$ php bin/console secrets:set ZUUL_CLIENT_ID
+$ php bin/console secrets:set ZUUL_CLIENT_SECRET
+----
+
+CAUTION: Secrets are encrypted using asymmetric cryptography. You must not publish the decryption key file (`config/secrets/<env>/<env>.decrypt.private.php`) if you don’t want them exposed! Encrypted secrets and encryption key are safe to commit to your repository.
+
+Copy the following files/directories from the sample project to yours:
+
+* `config/packages/knpu_oauth2_client.yaml`
+* `config/packages/security.yaml`
+* `src/Controller/SecurityController.php`
+* `src/OAuth2/`
+* `src/Security/`
+
+Copy definitions of all ``zuul.*`` parameters from the sample `config/services.yaml` to your `services.yaml`. You can change the value of `zuul.scopes` (all listed scopes must be active in the https://auth.fit.cvut.cz/manager/[Apps Manager]), but `zuul.client_id` and `zuul.client_secret` will be populated with secret values you configured earlier. Also copy the `AuthenticationEntryPointInterface` service definition from the same file.
+
+Add the https://symfony.com/doc/7.0/security.html#security-securing-controller[`IsGranted`] attribute to the routes or entire controllers you want to restrict access to:
+
+[source,php]
+----
+<?php
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+
+// ...
+
+#[Route('/page', name: 'page')]
+#[IsGranted('ROLE_USER')]
+public function renderPage(): Response
+----
+
+Done. To understand more, to learn how to customize the setup or to troubleshoot any issues, please read the rest of this guide and linked documentation pages.
